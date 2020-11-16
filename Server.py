@@ -9,7 +9,9 @@ import socket
 import threading
 import time
 
+import ctypes 
 
+                       
 class Text:
     
     """Classe contenant le texte a traiter"""
@@ -82,68 +84,170 @@ class Server:
     SERVER = socket.gethostbyname(socket.gethostname())
     ADDR = (SERVER, PORT)
     FORMAT = 'utf-8'
-    DISCONNECT_MESSAGE = "!DISCONNECT"
+    DISCONNECT_MESSAGE = "DISCONNECT"
+    NOT_CONNECTED_MESSAGE = "NOT_CONNECTED"
         
     
     def __init__(self):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind(self.ADDR)
-        self.clients = set()
-        
-        
-    def _make_connexions(self):
-        """Connetion aux clients. Ne pas appeler directement"""
+        self.mappers, self.reducers = set(), set()
         
         self.server.listen()
-        while self.waiting_for_clients :
-            
-            print("nombre de connexions : {}".format(len(self.clients)))
-            conn, addr = self.server.accept()
-            if self.waiting_for_clients : self.clients.add(Client(conn, addr))
-            
-            
-    def make_connexions(self):
-        """Appel à _make_connexions. Vous pouvez stopper l'attente de clients"""
+        self.server.settimeout(0.1)
+
+
+    def _make_connexions_reducers(self):
+        """Connetion aux reducers. Ne pas appeler directement"""
         
-        self.waiting_for_clients = True
+        #On vide les tentatives de connexions envoyees avant        
+        vider = True
+        while vider:
+            try :
+                conn, addr = self.server.accept()
+                conn.close()
+                print(conn,addr)
+            except socket.timeout:
+               vider = False
+                      
+        #Attente de connexions 
+        print("nombre de connexions : {}".format(len(self.reducers)))               
+        while self.waiting_for_reducers :  
+            try :
+                conn, addr = self.server.accept()
+            except socket.timeout:
+                continue
+            if self.waiting_for_reducers : 
+                self.reducers.add(Client(conn, addr))
+                conn.send("CONNECTED".encode(self.FORMAT))
+                print("nombre de connexions : {}".format(len(self.reducers)))
+            else :
+                conn.close()
+
+                
+                
+                        
+    def _make_connexions_mappers(self):
+        """Connetion aux mappers. Ne pas appeler directement"""
         
-        thread = threading.Thread(target=self._make_connexions)
+        #On vide les tentatives de connexions envoyees avant
+        vider = True
+        while vider:
+            try :
+                conn, addr = self.server.accept()
+                conn.close()
+            except socket.timeout:
+                vider = False
+                     
+        #Attente de connexions  
+        print("nombre de connexions : {}".format(len(self.mappers)))
+        while self.waiting_for_mappers :       
+            try :
+                conn, addr = self.server.accept()
+            except socket.timeout:
+                continue
+            if self.waiting_for_mappers : 
+                self.mappers.add(Client(conn, addr))              
+                conn.send("CONNECTED".encode(self.FORMAT))
+                print("nombre de connexions : {}".format(len(self.mappers)))
+            else :
+                conn.close()
+    
+    
+
+    def make_connexions_reducers(self):
+        """appel a _make_connexions_reducers. Vous pouvez stopper l'attente de reducers"""
+
+        self.waiting_for_reducers = True
+        
+        thread = threading.Thread(target=self._make_connexions_reducers)
         thread.start()
         
-        input("Appuyez pour ne plus attendre de clients")
-        self.waiting_for_clients = False
+        input("Appuyez pour ne plus attendre de reducers")
         
+        self.waiting_for_reducers = False
+        
+        
+    def make_connexions_mappers(self):
+        """appel a _make_connexions_mappers. Vous pouvez stopper l'attente de mappers"""
+        
+        self.waiting_for_mappers = True
+        
+        thread = threading.Thread(target=self._make_connexions_mappers)
+        thread.start()
+        
+        input("Appuyez pour ne plus attendre de mappers")
+        
+        self.waiting_for_mappers = False        
+        
+        
+    def make_connexions(self):
+        """Permet de setup toutes les connexions des le debut. Pour n'ajouter que des 
+        reducers ou que des mappers, appeller la fonction prevue a cet effet"""
+        
+        self.make_connexions_reducers()
+        self.make_connexions_mappers()
+    
+        
+
     
     def send_text(self, client, text):
         """Envoie le texte au client. Recoie le dictionnaire des occurences"""
         
         try :
+            msg = text.encode(self.FORMAT)
+            client['conn'].send(repr(set([r['addr'] for r in self.reducers])).encode()) #Envoie les adresses des reducers
+            msg_length = len(msg)
+            client['conn'].send(str(msg_length).encode(self.FORMAT))
+            time.sleep(1)
             client['conn'].send(text.encode(self.FORMAT))
             client['conn'].settimeout(5)
-            client['conn'].receive(2048).decode(self.FORMAT)
-            client['conn'].settimeout(None)
+            client['conn'].recv(2048).decode(self.FORMAT)
+            client['conn'].settimeout(0.1)
         
-        except Exception :
+        except socket.timeout :
+            print('Un client ne repond pas. Il est retire de la liste')
+            self.mappers.remove(client)
+ 
+        
+    def map_reduce(self, text_object):
+        """Decoupe le texte et l'envoie a chaque mapper.
+        Attend la reponse de chaque reducer."""
+        
+        nb_mappers = len(self.mappers)
+        text_object.set_subdivision(nb_mappers)
+        
+        threads = list()
+        for index, mapper in enumerate(self.mappers) :
+            thread = threading.Thread(target=self.send_text, args=(mapper, text_object[index]))
+            thread.start()
+            threads.append(thread)
+            
+        #On attend que toutes les actions map soient faites
+        for thread in threads:
+            thread.join()
+            
+        print('OUIIII')
+            
+        #On se connecte aux reducers
+        for reducer in self.reducers:
             pass
+            
+        #On donne le signal pour envoyer les resultats aux reducers
+        for mapper in self.mappers:
+            mapper['conn'].send(b"GO")
+            
+            
         
-        
-    def repartir(self, text_object):
-        """Decoupe le texte et l'envoie a chaque client"""
-        
-        nb_clients = len(self.clients)
-        text_object.set_subdivision(nb_clients)
-        
-        for index, client in enumerate(self.clients) :
-            self.send_text(client, text_object[index])
     
     
     def close_connexions(self):
         """Ferme tous les sockets"""
         
-        for client in self.clients :
-            client['conn'].close()
+        for mapper in self.mappers :
+            mapper['conn'].close()
         
         
 
-        
+#conn.send(repr(set([r['addr'] for r in self.reducers])).encode())        
         
