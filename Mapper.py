@@ -7,6 +7,7 @@ Created on Sat Nov  7 14:45:42 2020
 
 
 import socket
+import threading
 
 class Mapper:
     
@@ -39,7 +40,13 @@ class Mapper:
         except socket.timeout:
             print('La connexion a ete refusee')
             
-            
+     
+    def send_dict_to_reducer(self, reducer, results):
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client.connect((self.SERVER, reducer))
+        client.send(repr(results).encode())
+        print(repr(results).encode())
+
     def map_func(self):
         
        self.reducers = eval(self.client.recv(2048).decode(self.FORMAT))
@@ -49,22 +56,34 @@ class Mapper:
        print(text)
        results = dict()
        next_word = ''
+       ponctuation = [' ', '\n', '.', '!', ',', '?']
        for lettre in text:
-           if (lettre == ' ' or lettre == '\n') and len(next_word) > 0:
+           if (lettre in ponctuation) and len(next_word) > 0:
                try : results[next_word]+=1
                except KeyError: results[next_word] = 1
                finally: next_word = ''
-           else :
+           elif lettre not in ponctuation :
                next_word+=lettre
                
        print(results)
-               
-       self.client.send(b'DONE')
+                      
+       nb_reducers = len(self.reducers)
+       destination_occurences = dict()
+       for reducer in self.reducers :
+           destination_occurences[reducer] = {}
+       
+       for word, occurence in results.items() :
+           index = hash(word)%nb_reducers #Sert a la repartition des mots
+           destination_occurences[self.reducers[index]][word] = occurence
+          
+       self.client.send(b'DONE')       
+       self.client.recv(2048) #Attente du GO pour synchroniser tous les mappers
+       
+       for reducer in self.reducers:
+           thread = threading.Thread(target=self.send_dict_to_reducer, args=(reducer, destination_occurences[reducer]))
+           thread.start()
            
             
             
-from collections import Counter
-dict1 = {'a':1, 'b': 2}
-dict2 = {'b':10, 'c': 11}
-result = dict(Counter(dict1) + Counter(dict2))
+
         

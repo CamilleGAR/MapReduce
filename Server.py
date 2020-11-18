@@ -91,7 +91,7 @@ class Server:
     def __init__(self):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind(self.ADDR)
-        self.mappers, self.reducers = set(), set()
+        self.mappers, self.reducers = set(), list()
         
         self.server.listen()
         self.server.settimeout(0.1)
@@ -118,7 +118,7 @@ class Server:
             except socket.timeout:
                 continue
             if self.waiting_for_reducers : 
-                self.reducers.add(Client(conn, addr))
+                self.reducers.append(Client(conn, addr))
                 conn.send("CONNECTED".encode(self.FORMAT))
                 print("nombre de connexions : {}".format(len(self.reducers)))
             else :
@@ -191,12 +191,12 @@ class Server:
         
 
     
-    def send_text(self, client, text):
-        """Envoie le texte au client. Recoie le dictionnaire des occurences"""
+    def send_text_to_mappers(self, client, text):
+        """Envoie le texte au client."""
         
         try :
             msg = text.encode(self.FORMAT)
-            client['conn'].send(repr(set([r['addr'] for r in self.reducers])).encode()) #Envoie les adresses des reducers
+            client['conn'].send(repr(list([abs(hash(r))%100000 for r in self.reducers])).encode()) #genere des adresses pour les reducers
             msg_length = len(msg)
             client['conn'].send(str(msg_length).encode(self.FORMAT))
             time.sleep(1)
@@ -209,6 +209,27 @@ class Server:
             print('Un client ne repond pas. Il est retire de la liste')
             self.mappers.remove(client)
  
+    def receive_dict_from_reducers(self, client):
+        """Recoit les resultats"""
+        
+        try:
+            client['conn'].settimeout(5)
+            result = client['conn'].recv(2048).decode(self.FORMAT)
+            client['conn'].settimeout(0.1)
+            
+        except socket.timeout :
+            pass
+        
+        print(result)
+        
+    def setup_reducer(self, client, nb_mappers):
+        client['conn'].send(str((nb_mappers, abs(hash(client))%100000)).encode())
+        try :
+            client['conn'].settimeout(5)
+            client['conn'].recv(2048).decode(self.FORMAT)
+            client['conn'].settimeout(0.1)
+        except socket.timeout:
+            pass
         
     def map_reduce(self, text_object):
         """Decoupe le texte et l'envoie a chaque mapper.
@@ -219,7 +240,7 @@ class Server:
         
         threads = list()
         for index, mapper in enumerate(self.mappers) :
-            thread = threading.Thread(target=self.send_text, args=(mapper, text_object[index]))
+            thread = threading.Thread(target=self.send_text_to_mappers, args=(mapper, text_object[index]))
             thread.start()
             threads.append(thread)
             
@@ -229,14 +250,23 @@ class Server:
             
         print('OUIIII')
             
-        #On se connecte aux reducers
+        #On setup les reducers
         for reducer in self.reducers:
-            pass
+            thread = threading.Thread(target = self.setup_reducer(reducer, len(self.mappers)))
+            thread.start()
+            threads.append(thread)
+            
+        for thread in threads:
+            thread.join()
             
         #On donne le signal pour envoyer les resultats aux reducers
         for mapper in self.mappers:
             mapper['conn'].send(b"GO")
+                       
             
+            thread = threading.Thread(target = self.receive_dict_from_reducers, args=(reducer))
+            
+
             
         
     
