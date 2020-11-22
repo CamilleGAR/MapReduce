@@ -32,7 +32,8 @@ class Text:
         self.nb_subd = nb_subd
         self.subdivisions = []
         for subd in self.generateur_subdivisions(nb_subd):
-            self.subdivisions.append(subd)
+            #On ajoute un point pour faciliter le traitement du texte
+            self.subdivisions.append(subd+'.')
             
     def generateur_subdivisions(self, nb_sub):
         """Generateur qui renvoie les subdvisions. Le texte est coupe entre deux mots"""

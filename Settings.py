@@ -11,5 +11,5 @@ SERVER_PORT = 5050
 SERVER_IP = socket.gethostbyname(socket.gethostname())
 SERVER_ADDR = (SERVER_IP, SERVER_PORT)
 
-SERVER_IP = socket.gethostbyname(socket.gethostname())
-SERVER_IP = socket.gethostbyname(socket.gethostname())
+MAPPER_IP = socket.gethostbyname(socket.gethostname())
+REDUCER_IP = socket.gethostbyname(socket.gethostname())
