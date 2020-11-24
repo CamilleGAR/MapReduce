@@ -35,6 +35,8 @@ class Server:
         self.mappers, self.reducers = list(), list()
         self.waiting_for_reducers, self.waiting_for_mappers = False, False
         self.lock = threading.RLock()
+        self.text_failed = ''
+        self.lock_failed = threading.RLock()
         self.resultats = {}
         
         #initialisation des clients
@@ -122,6 +124,9 @@ class Server:
         """Envoie le texte au client."""
         
         try : 
+            
+            conn.setblocking(True)
+            
             #On envoie la liste des addr des reducers aux mappers.
             conn.send(repr(list(self.generate_port(r) for r in self.reducers)).encode()) 
     
@@ -145,15 +150,24 @@ class Server:
                 raise ResponseError('Le message recu n\'est pas celui attendu')
             conn.settimeout(0)
         
-        except socket.timeout :
+        except socket.timeout:
             print('Un mapper ne repond pas. Il est retire de la liste')
-            self.mappers.remove(client)
+            self.mappers.remove(conn)
+            with self.lock_failed:
+                self.text_failed += text
             
         except ResponseError as error_msg:
             print(error_msg, ': Le mapper est retire de la liste')
-            self.mappers.remove(client)
- 
-    
+            self.mappers.remove(conn)
+            with self.lock_failed:
+                self.text_failed += text
+                
+        except ConnectionResetError:
+            print('Un mapper est deconnecte. Il est retire de la liste')
+            self.mappers.remove(conn)
+            with self.lock_failed:
+                self.text_failed += text
+                
     def setup_reducer(self, conn, nb_mappers):
         """Envoie aux reducers le nombre de mappers et le port qu'il doit prendre"""
         
@@ -163,7 +177,7 @@ class Server:
         #Attente de confirmation pour etre sur que le reducer est operationnel
         try :
             conn.settimeout(5)
-            conn.recv(2048).decode(self.FORMAT)
+            conn.recv(2048).decode(FORMAT)
             conn.settimeout(0)
         except socket.timeout:
             pass
@@ -183,10 +197,15 @@ class Server:
             print("un reducer ne repond pas. Il est retire de la liste")
         
 
-    def map_reduce(self, text_object):
+    def map_reduce(self, text_object, reset_results = True):
         """Decoupe le texte et l'envoie a chaque mapper.
         Attend la reponse de chaque reducer."""
         
+        #On reinitialise les resultats
+        self.text_failed = ''
+        if reset_results == True :
+            self.resultats = {}
+            
         #Nombre de mappers disponibles
         nb_mappers = len(self.mappers)
         
@@ -230,7 +249,14 @@ class Server:
         join_threads(threads)
         
         #Affiche le resultat final
-        print('Resultats : ', self.resultats)
+        #print('Resultats : ', self.resultats)
+        
+        #On relance les textes manquants a cause des mappers qui ont crash
+        if self.text_failed != '':
+            print('on renvoie aux mappers restants les textes ayant echoues')
+            self.map_reduce(Text('str', self.text_failed), reset_results = False)
+            
+        return self.resultats
 
             
         def __call__(self, text_object):

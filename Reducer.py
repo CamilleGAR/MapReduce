@@ -49,7 +49,8 @@ class Reducer:
             print("Vous etes connectes")
             
             #On commence la tache reduce
-            self.reduce_func()
+            while 1:
+                self.reduce_func()
             
         except socket.timeout:
             print('La connexion a ete refusee')
@@ -67,6 +68,9 @@ class Reducer:
         
         
     def reduce_func(self):
+        
+        #reinitialisation
+        self.occurences = {}
             
         #On se met en attente jusqu'au prochain message du server
         self.client.setblocking(True)
@@ -75,8 +79,11 @@ class Reducer:
         nb_mappers, serv_port = eval(self.client.recv(2048).decode(FORMAT))
             
         #Setting du socket server
-        self.server.bind((REDUCER_IP, serv_port))
-        self.server.listen()
+        try :
+            self.server.bind((REDUCER_IP, serv_port))
+            self.server.listen()
+        except OSError:
+            pass
             
         threads = []
         for m in range(nb_mappers) :

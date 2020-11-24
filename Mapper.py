@@ -37,7 +37,8 @@ class Mapper:
             print("Vous etes connectes")
             
             #On commence la tache map
-            self.map_func()
+            while 1:
+                self.map_func()
             
         except socket.timeout:
             print('Pas de reponse : La connexion a ete refusee')
