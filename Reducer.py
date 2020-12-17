@@ -9,8 +9,11 @@ Created on Mon Nov 16 15:30:20 2020
 
 import socket
 import threading
+from Constantes import *
+from ServerSettings import *
 from ResponseError import ResponseError
 from collections import Counter
+
 
 class Reducer:
         

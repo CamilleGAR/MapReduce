@@ -7,7 +7,7 @@ Created on Sat Nov 21 19:16:11 2020
 
 FORMAT = 'utf-8'
 
-ALPHABET = 'azertyuiopqsdfghjklmwxcvbnAZERTYUIOPQSDFGHJKLMWXCVBNéèàïü'
+ALPHABET = 'azertyuiopqsdfghjklmwxcvbnAZERTYUIOPQSDFGHJKLMWXCVBNéèàïü0123456789'
 PONCTUATION = ' ,?;.:/!%*&\"#\'{(-_)=+}[\\°\n'
 
 CONNECTED_MESSAGE = "CONNECTED"

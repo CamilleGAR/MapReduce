@@ -8,6 +8,8 @@ Created on Sat Nov  7 14:45:42 2020
 
 import socket
 import threading
+from Constantes import *
+from ServerSettings import *
 from ResponseError import ResponseError
 import hashlib
 
@@ -74,7 +76,7 @@ class Mapper:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect(reducer)
             client.send(repr(results).encode())
-            print('\nresultat envoyé au reducer [addr : {}], :'.format(reducer), repr(results).encode())
+            print('\nresultat envoye au reducer [addr : {}], :'.format(reducer), repr(results).encode())
         
         except Exception :
             pass

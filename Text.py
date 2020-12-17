@@ -4,7 +4,7 @@ Created on Sat Nov 21 13:28:45 2020
 
 @author: camil
 """
-
+from tika import parser
 
 class Text:
     
@@ -13,17 +13,15 @@ class Text:
     def __init__(self, source, reference):
         """Veuillez indiquer la source pour savoir comment traiter l'information"""
         
-        if source == 'web' :
-            pass
-        
-        elif source == 'txt' :
-            pass
+        if source == 'txt' :
+            with open(reference, 'r') as file:
+                self.text = file.read()
         
         elif source == 'str' :
             self.text = reference
             
         else :
-            raise BaseException("La source doit être web/txt/str")
+            raise BaseException("La source doit être str/txt")
             
             
     def set_subdivision(self, nb_subd):
@@ -56,4 +54,7 @@ class Text:
         
         except :
             print("Les subdivisions n'ont pas ete creees")
+            
+    def __len__(self):
+        return len(self.text)
             

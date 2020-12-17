@@ -228,7 +228,6 @@ class Server:
             
         #On divise le texte
         text_object.set_subdivision(nb_mappers)
-            
         print('On envoie un morceau du texte à chaque mapper')
         #On envoie chaque morceau de texte à son mapper
         threads = list()
