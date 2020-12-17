@@ -8,8 +8,6 @@ Created on Sat Nov  7 14:45:42 2020
 
 import socket
 import threading
-from Constantes import *
-from Settings import *
 from ResponseError import ResponseError
 import hashlib
 
@@ -38,7 +36,12 @@ class Mapper:
             
             #On commence la tache map
             while 1:
-                self.map_func()
+                try:
+                    self.map_func()
+                except ResponseError:
+                    continue
+                except ConnectionResetError:
+                    print('Un reducer est inactif, en attente d\'ordre du server')
             
         except socket.timeout:
             print('Pas de reponse : La connexion a ete refusee')
@@ -63,14 +66,18 @@ class Mapper:
         return results
      
         
-    def send_dict_to_reducer(self, port_reducer, results):
+    def send_dict_to_reducer(self, reducer, results):
         """Cree un socket qui se connecte au reducer.
         Lui envoie ensuite les resultats mis en parametre"""
         
-        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client.connect((REDUCER_IP, port_reducer))
-        client.send(repr(results).encode())
-        print('\nresultat envoyé au reducer [port : {}], :'.format(port_reducer), repr(results).encode())
+        try:
+            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client.connect(reducer)
+            client.send(repr(results).encode())
+            print('\nresultat envoyé au reducer [addr : {}], :'.format(reducer), repr(results).encode())
+        
+        except Exception :
+            pass
 
 
     def map_func(self):

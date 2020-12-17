@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Created on Mon Nov 16 15:30:20 2020
@@ -8,18 +9,14 @@ Created on Mon Nov 16 15:30:20 2020
 
 import socket
 import threading
-from Constantes import *
-from Settings import *
 from ResponseError import ResponseError
-
 from collections import Counter
-# dict1 = {'a':1, 'b': 2}
-# dict2 = {'b':10, 'c': 11}
-# result = dict(Counter(dict1) + Counter(dict2))
 
 class Reducer:
         
     def __init__(self):
+        
+        self.REDUCER_IP = socket.gethostbyname(socket.gethostname())
         
         #Socket se connectant au Server
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
@@ -76,11 +73,12 @@ class Reducer:
         self.client.setblocking(True)
             
         #Le server nous envoie le nombre de mappers ainsi que le port qui nous est imposee
-        nb_mappers, serv_port = eval(self.client.recv(2048).decode(FORMAT))
+        nb_mappers, my_port = eval(self.client.recv(2048).decode(FORMAT)) 
+        self.client.send(b'OK') #Confirmation
             
         #Setting du socket server
         try :
-            self.server.bind((REDUCER_IP, serv_port))
+            self.server.bind((self.REDUCER_IP, my_port))
             self.server.listen()
         except OSError:
             pass
